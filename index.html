@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EduTrack Pro &bull; Full Stack Student Management System</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- React 18 & ReactDOM via CDN for Instant Free GitHub Pages Hosting -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- External Stylesheets -->
+  <link rel="stylesheet" href="client/src/styles/index.css" />
+  <link rel="stylesheet" href="client/src/styles/App.css" />
+</head>
+<body data-theme="dark">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    const DEPARTMENTS = [
+      "Computer Science & Engineering",
+      "Information Technology",
+      "Data Science & AI",
+      "Electronics & Communication",
+      "Electrical & Electronics",
+      "Mechanical Engineering"
+    ];
+
+    const SEMESTERS = [
+      "Semester 1", "Semester 2", "Semester 3", "Semester 4",
+      "Semester 5", "Semester 6", "Semester 7", "Semester 8"
+    ];
+
+    const initialStudents = [
+      {
+        id: "STU-2024-001",
+        fullName: "Aarav Sharma",
+        email: "aarav.sharma@example.com",
+        phone: "9876543210",
+        dob: "2003-05-14",
+        gender: "Male",
+        department: "Computer Science & Engineering",
+        semester: "Semester 6",
+        cgpa: "8.9",
+        status: "Active",
+        admissionDate: "2023-08-10",
+        address: "Bengaluru, Karnataka"
+      },
+      {
+        id: "STU-2024-002",
+        fullName: "U B Aiswarya",
+        email: "aiswarya.ub@example.com",
+        phone: "9123456780",
+        dob: "2004-03-22",
+        gender: "Female",
+        department: "Information Technology",
+        semester: "Semester 8",
+        cgpa: "9.2",
+        status: "Active",
+        admissionDate: "2023-08-01",
+        address: "Chennai, Tamil Nadu"
+      },
+      {
+        id: "STU-2024-003",
+        fullName: "Rohan Varma",
+        email: "rohan.varma@example.com",
+        phone: "9845123456",
+        dob: "2003-11-09",
+        gender: "Male",
+        department: "Electronics & Communication",
+        semester: "Semester 6",
+        cgpa: "8.4",
+        status: "Active",
+        admissionDate: "2023-08-12",
+        address: "Hyderabad, Telangana"
+      },
+      {
+        id: "STU-2024-004",
+        fullName: "Pooja Hegde",
+        email: "pooja.hegde@example.com",
+        phone: "9731245678",
+        dob: "2004-07-19",
+        gender: "Female",
+        department: "Computer Science & Engineering",
+        semester: "Semester 4",
+        cgpa: "8.7",
+        status: "Active",
+        admissionDate: "2024-08-05",
+        address: "Mangalore, Karnataka"
+      },
+      {
+        id: "STU-2024-005",
+        fullName: "Karthik Nair",
+        email: "karthik.nair@example.com",
+        phone: "9447123987",
+        dob: "2002-12-30",
+        gender: "Male",
+        department: "Data Science & AI",
+        semester: "Semester 8",
+        cgpa: "9.0",
+        status: "Active",
+        admissionDate: "2023-07-28",
+        address: "Kochi, Kerala"
+      }
+    ];
+
+    const API_URL = 'http://localhost:5000/api';
+
+    function App() {
+      const [students, setStudents] = useState(() => {
+        try {
+          const saved = localStorage.getItem('fullstack_students');
+          return saved ? JSON.parse(saved) : initialStudents;
+        } catch (e) {
+          return initialStudents;
+        }
+      });
+
+      const [backendOnline, setBackendOnline] = useState(false);
+      const [theme, setTheme] = useState(() => localStorage.getItem('fullstack_theme') || 'dark');
+      const [isFormOpen, setIsFormOpen] = useState(false);
+      const [editingStudent, setEditingStudent] = useState(null);
+      const [selectedStudent, setSelectedStudent] = useState(null);
+      const [deletingStudent, setDeletingStudent] = useState(null);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedDepartment, setSelectedDepartment] = useState('All');
+      const [sortBy, setSortBy] = useState('name-asc');
+      const [viewMode, setViewMode] = useState('table');
+      const [toast, setToast] = useState(null);
+
+      // Check live backend
+      useEffect(() => {
+        async function checkApi() {
+          try {
+            const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(2000) });
+            if (res.ok) {
+              setBackendOnline(true);
+              const data = await fetch(`${API_URL}/students`);
+              const json = await data.json();
+              if (json.data && json.data.length > 0) {
+                const normalized = json.data.map(s => ({
+                  ...s,
+                  fullName: s.fullName || s.full_name,
+                  admissionDate: s.admission_date || s.admissionDate || '2023-08-01'
+                }));
+                setStudents(normalized);
+              }
+            }
+          } catch (e) {
+            setBackendOnline(false);
+          }
+        }
+        checkApi();
+      }, []);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem('fullstack_students', JSON.stringify(students));
+        } catch (e) {}
+      }, [students]);
+
+      useEffect(() => {
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('fullstack_theme', theme);
+      }, [theme]);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      const handleFormSubmit = async (data) => {
+        if (editingStudent) {
+          if (backendOnline) {
+            try {
+              await fetch(`${API_URL}/students/${data.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+              });
+            } catch (e) {}
+          }
+          setStudents(prev => prev.map(s => s.id === data.id ? data : s));
+          showToast(`Record for ${data.fullName} updated!`, 'info');
+        } else {
+          if (backendOnline) {
+            try {
+              await fetch(`${API_URL}/students`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+              });
+            } catch (e) {}
+          }
+          setStudents(prev => [data, ...prev]);
+          showToast(`Student ${data.fullName} registered successfully!`, 'success');
+        }
+        setEditingStudent(null);
+      };
+
+      const handleConfirmDelete = async (id) => {
+        if (backendOnline) {
+          try {
+            await fetch(`${API_URL}/students/${id}`, { method: 'DELETE' });
+          } catch (e) {}
+        }
+        const item = students.find(s => s.id === id);
+        setStudents(prev => prev.filter(s => s.id !== id));
+        showToast(`Student record (${item ? item.fullName : id}) removed.`, 'danger');
+      };
+
+      const filteredStudents = useMemo(() => {
+        return students
+          .filter(s => {
+            const matchesSearch =
+              (s.fullName || s.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (s.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+              (s.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesDept = selectedDepartment === 'All' || s.department === selectedDepartment;
+            return matchesSearch && matchesDept;
+          })
+          .sort((a, b) => {
+            const nameA = a.fullName || a.full_name || '';
+            const nameB = b.fullName || b.full_name || '';
+            if (sortBy === 'name-asc') return nameA.localeCompare(nameB);
+            if (sortBy === 'name-desc') return nameB.localeCompare(nameA);
+            if (sortBy === 'cgpa-desc') return (parseFloat(b.cgpa) || 0) - (parseFloat(a.cgpa) || 0);
+            if (sortBy === 'id-asc') return a.id.localeCompare(b.id);
+            return 0;
+          });
+      }, [students, searchTerm, selectedDepartment, sortBy]);
+
+      const totalStudents = students.length;
+      const deptCount = new Set(students.map(s => s.department)).size;
+      const avgCgpa = totalStudents > 0
+        ? (students.reduce((acc, curr) => acc + (parseFloat(curr.cgpa) || 0), 0) / totalStudents).toFixed(2)
+        : "0.00";
+      const femaleCount = students.filter(s => s.gender === 'Female').length;
+      const maleCount = students.filter(s => s.gender === 'Male').length;
+
+      const handleExportCsv = () => {
+        if (filteredStudents.length === 0) return;
+        const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Date of Birth', 'Gender', 'Department', 'Semester', 'CGPA', 'Status', 'Address'];
+        const rows = filteredStudents.map(s => [
+          s.id, `"${s.fullName || s.full_name}"`, s.email, s.phone, s.dob, s.gender, `"${s.department}"`, s.semester, s.cgpa || '', s.status, `"${s.address || ''}"`
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const link = document.createElement('a');
+        link.setAttribute('href', encodeURI(csvContent));
+        link.setAttribute('download', `students_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Exported records to CSV!', 'success');
+      };
+
+      return (
+        <div className="app-wrapper">
+          <header className="app-header">
+            <div className="header-container">
+              <div className="header-brand">
+                <div className="brand-icon"><i className="fa-solid fa-graduation-cap"></i></div>
+                <div>
+                  <h1 className="brand-title">EduTrack Pro</h1>
+                  <p className="brand-subtitle">Full-Stack Student Management System (React &bull; Node &bull; Express &bull; MySQL)</p>
+                </div>
+              </div>
+              <div className="header-actions">
+                <div className={`connection-pill ${backendOnline ? 'conn-online' : 'conn-fallback'}`}>
+                  <span className="pill-dot"></span>
+                  <span>{backendOnline ? 'Live API (MySQL)' : 'Demo Mode (Local Data)'}</span>
+                </div>
+                <div className="student-counter-pill">
+                  <span>{totalStudents} Enrolled</span>
+                </div>
+                <button
+                  className="theme-btn"
+                  onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                  title="Toggle Theme"
+                >
+                  <i className={theme === 'dark' ? "fa-solid fa-sun" : "fa-solid fa-moon"}></i>
+                </button>
+                <a
+                  href="https://github.com/aiswaryabala17/fullstack-student-management"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="github-link-btn"
+                >
+                  <i className="fa-brands fa-github"></i>
+                  <span className="github-text">Repo</span>
+                </a>
+                <button className="btn btn-primary new-student-btn" onClick={() => { setEditingStudent(null); setIsFormOpen(true); }}>
+                  <i className="fa-solid fa-user-plus"></i>
+                  <span>Register Student</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="main-container">
+            {/* Stats Overview */}
+            <section className="stats-section">
+              <div className="stat-card">
+                <div className="stat-icon icon-indigo"><i className="fa-solid fa-users"></i></div>
+                <div className="stat-content">
+                  <span className="stat-label">Total Registered</span>
+                  <h3 className="stat-value">{totalStudents}</h3>
+                  <span className="stat-subtext">Active student profiles</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon icon-emerald"><i className="fa-solid fa-building-columns"></i></div>
+                <div className="stat-content">
+                  <span className="stat-label">Departments</span>
+                  <h3 className="stat-value">{deptCount}</h3>
+                  <span className="stat-subtext">Active branches</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon icon-amber"><i className="fa-solid fa-star"></i></div>
+                <div className="stat-content">
+                  <span className="stat-label">Average CGPA</span>
+                  <h3 className="stat-value">{avgCgpa}</h3>
+                  <span className="stat-subtext">Across all batches</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon icon-cyan"><i className="fa-solid fa-venus-mars"></i></div>
+                <div className="stat-content">
+                  <span className="stat-label">Gender Diversity</span>
+                  <h3 className="stat-value">{femaleCount}F : {maleCount}M</h3>
+                  <span className="stat-subtext">Balanced enrollment</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Search Filter Panel */}
+            <div className="search-filter-panel">
+              <div className="search-box">
+                <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                <input
+                  type="text"
+                  placeholder="Search by student name, ID, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button className="clear-search-btn" onClick={() => setSearchTerm('')}>
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                )}
+              </div>
+              <div className="filters-group">
+                <div className="select-wrapper">
+                  <i className="fa-solid fa-filter select-icon"></i>
+                  <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)}>
+                    <option value="All">All Departments</option>
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="select-wrapper">
+                  <i className="fa-solid fa-arrow-down-short-wide select-icon"></i>
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                    <option value="name-asc">Name (A &rarr; Z)</option>
+                    <option value="name-desc">Name (Z &rarr; A)</option>
+                    <option value="cgpa-desc">CGPA (High &rarr; Low)</option>
+                    <option value="id-asc">Student ID</option>
+                  </select>
+                </div>
+                <div className="view-toggle">
+                  <button className={`toggle-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')}>
+                    <i className="fa-solid fa-table-list"></i>
+                  </button>
+                  <button className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')}>
+                    <i className="fa-solid fa-grip"></i>
+                  </button>
+                </div>
+                <button className="btn btn-secondary action-btn" onClick={handleExportCsv} title="Export CSV">
+                  <i className="fa-solid fa-file-csv"></i><span>Export</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Content Display */}
+            {viewMode === 'table' ? (
+              <div className="table-responsive">
+                {filteredStudents.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon"><i className="fa-solid fa-user-slash"></i></div>
+                    <h3>No Student Records Found</h3>
+                    <p>Try adjusting your search query, department filter, or register a new student.</p>
+                  </div>
+                ) : (
+                  <table className="student-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>ID / Roll No</th>
+                        <th>Department</th>
+                        <th>Semester</th>
+                        <th>CGPA</th>
+                        <th>Status</th>
+                        <th className="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map(student => (
+                        <tr key={student.id} className="student-row">
+                          <td>
+                            <div className="student-cell-identity">
+                              <div className={`avatar ${(student.gender || 'other').toLowerCase()}`}>
+                                {(student.fullName || student.full_name || 'S').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="student-name" onClick={() => setSelectedStudent(student)}>
+                                  {student.fullName || student.full_name}
+                                </span>
+                                <span className="student-email">{student.email}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span className="badge-id">{student.id}</span></td>
+                          <td><span className="dept-tag">{student.department}</span></td>
+                          <td><span className="sem-text">{student.semester}</span></td>
+                          <td>
+                            <span className={`cgpa-pill ${parseFloat(student.cgpa) >= 8.5 ? 'cgpa-high' : 'cgpa-med'}`}>
+                              {student.cgpa || 'N/A'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`status-badge status-${(student.status || 'Active').toLowerCase().replace(' ', '-')}`}>
+                              <span className="dot"></span>{student.status || 'Active'}
+                            </span>
+                          </td>
+                          <td className="text-right">
+                            <div className="action-buttons-group">
+                              <button className="action-icon-btn view-btn" onClick={() => setSelectedStudent(student)} title="View Profile">
+                                <i className="fa-solid fa-eye"></i>
+                              </button>
+                              <button className="action-icon-btn edit-btn" onClick={() => { setEditingStudent(student); setIsFormOpen(true); }} title="Edit">
+                                <i className="fa-solid fa-pen-to-square"></i>
+                              </button>
+                              <button className="action-icon-btn delete-btn" onClick={() => setDeletingStudent(student)} title="Delete">
+                                <i className="fa-solid fa-trash-can"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ) : (
+              <div className="student-grid">
+                {filteredStudents.length === 0 ? (
+                  <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
+                    <div className="empty-icon"><i className="fa-solid fa-user-slash"></i></div>
+                    <h3>No Student Records Found</h3>
+                  </div>
+                ) : (
+                  filteredStudents.map(student => (
+                    <article key={student.id} className="student-grid-card">
+                      <div className="card-top">
+                        <div className="card-identity">
+                          <div className={`avatar ${(student.gender || 'other').toLowerCase()}`}>
+                            {(student.fullName || student.full_name || 'S').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="card-student-name" onClick={() => setSelectedStudent(student)}>
+                              {student.fullName || student.full_name}
+                            </h4>
+                            <span className="badge-id">{student.id}</span>
+                          </div>
+                        </div>
+                        <span className={`status-badge status-${(student.status || 'Active').toLowerCase().replace(' ', '-')}`}>
+                          <span className="dot"></span>{student.status || 'Active'}
+                        </span>
+                      </div>
+                      <div className="card-info-list">
+                        <div className="info-row"><i className="fa-solid fa-graduation-cap"></i><span>{student.department}</span></div>
+                        <div className="info-row"><i className="fa-regular fa-envelope"></i><span className="truncate">{student.email}</span></div>
+                        <div className="info-row"><i className="fa-solid fa-phone"></i><span>{student.phone}</span></div>
+                        <div className="info-row-split">
+                          <div className="info-mini"><span className="lbl">Semester:</span><span className="val">{student.semester}</span></div>
+                          <div className="info-mini"><span className="lbl">CGPA:</span><span className="val cgpa-highlight">{student.cgpa || 'N/A'}</span></div>
+                        </div>
+                      </div>
+                      <div className="card-actions-footer">
+                        <button className="btn btn-outline-sm" onClick={() => setSelectedStudent(student)}>
+                          <i className="fa-regular fa-id-badge"></i><span>Details</span>
+                        </button>
+                        <div className="card-quick-actions">
+                          <button className="action-icon-btn edit-btn" onClick={() => { setEditingStudent(student); setIsFormOpen(true); }}><i className="fa-solid fa-pen-to-square"></i></button>
+                          <button className="action-icon-btn delete-btn" onClick={() => setDeletingStudent(student)}><i className="fa-solid fa-trash-can"></i></button>
+                        </div>
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            )}
+          </main>
+
+          {/* Form Modal */}
+          {isFormOpen && (
+            <div className="modal-overlay" onClick={() => setIsFormOpen(false)}>
+              <div className="modal-dialog form-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <div className="modal-title-wrapper">
+                    <div className="modal-icon"><i className={editingStudent ? "fa-solid fa-user-pen" : "fa-solid fa-user-plus"}></i></div>
+                    <div>
+                      <h2 className="modal-title">{editingStudent ? 'Edit Student Details' : 'Register New Student'}</h2>
+                      <p className="modal-subtitle">Full-Stack Form Integration (React &rarr; Express &rarr; MySQL)</p>
+                    </div>
+                  </div>
+                  <button className="close-btn" onClick={() => setIsFormOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+                </div>
+                <StudentFormInner
+                  editingStudent={editingStudent}
+                  existingIds={students.map(s => s.id)}
+                  onClose={() => setIsFormOpen(false)}
+                  onSubmit={(data) => { handleFormSubmit(data); setIsFormOpen(false); }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Detail Dossier Modal */}
+          {selectedStudent && (
+            <div className="modal-overlay" onClick={() => setSelectedStudent(null)}>
+              <div className="modal-dialog detail-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <div className="modal-title-wrapper">
+                    <div className="modal-icon"><i className="fa-solid fa-id-card-clip"></i></div>
+                    <div>
+                      <h2 className="modal-title">Student Profile Dossier</h2>
+                      <p className="modal-subtitle">Full academic &amp; contact record</p>
+                    </div>
+                  </div>
+                  <button className="close-btn" onClick={() => setSelectedStudent(null)}><i className="fa-solid fa-xmark"></i></button>
+                </div>
+                <div className="detail-body">
+                  <div className="detail-banner">
+                    <div className={`avatar-large ${(selectedStudent.gender || 'other').toLowerCase()}`}>
+                      {(selectedStudent.fullName || selectedStudent.full_name || 'S').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="banner-info">
+                      <h3 className="banner-name">{selectedStudent.fullName || selectedStudent.full_name}</h3>
+                      <div className="banner-tags">
+                        <span className="badge-id">{selectedStudent.id}</span>
+                        <span className="cgpa-pill cgpa-high">CGPA: {selectedStudent.cgpa || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="detail-grid">
+                    <div className="detail-item"><span className="detail-label">Department</span><span className="detail-value">{selectedStudent.department}</span></div>
+                    <div className="detail-item"><span className="detail-label">Semester</span><span className="detail-value">{selectedStudent.semester}</span></div>
+                    <div className="detail-item"><span className="detail-label">Email</span><span className="detail-value">{selectedStudent.email}</span></div>
+                    <div className="detail-item"><span className="detail-label">Phone</span><span className="detail-value">{selectedStudent.phone}</span></div>
+                    <div className="detail-item"><span className="detail-label">Date of Birth</span><span className="detail-value">{selectedStudent.dob || 'N/A'}</span></div>
+                    <div className="detail-item"><span className="detail-label">Gender</span><span className="detail-value">{selectedStudent.gender}</span></div>
+                    <div className="detail-item"><span className="detail-label">City</span><span className="detail-value">{selectedStudent.address || 'N/A'}</span></div>
+                    <div className="detail-item"><span className="detail-label">Status</span><span className="detail-value">{selectedStudent.status || 'Active'}</span></div>
+                  </div>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" onClick={() => setSelectedStudent(null)}>Close</button>
+                  <button className="btn btn-primary" onClick={() => { const s = selectedStudent; setSelectedStudent(null); setEditingStudent(s); setIsFormOpen(true); }}>
+                    <i className="fa-solid fa-pen-to-square"></i><span>Edit Record</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Confirmation Modal */}
+          {deletingStudent && (
+            <div className="modal-overlay" onClick={() => setDeletingStudent(null)}>
+              <div className="modal-dialog delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="delete-icon-wrapper"><i className="fa-solid fa-triangle-exclamation"></i></div>
+                <h3 className="delete-modal-title">Delete Student Record?</h3>
+                <p className="delete-modal-text">Are you sure you want to delete <strong>{deletingStudent.fullName || deletingStudent.full_name}</strong> ({deletingStudent.id})? This will update the database.</p>
+                <div className="modal-actions delete-actions">
+                  <button className="btn btn-secondary" onClick={() => setDeletingStudent(null)}>Cancel</button>
+                  <button className="btn btn-danger" onClick={() => { handleConfirmDelete(deletingStudent.id); setDeletingStudent(null); }}>
+                    <i className="fa-solid fa-trash-can"></i><span>Confirm Delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Toast Notification */}
+          {toast && (
+            <div className="toast-container">
+              <div className={`toast toast-${toast.type}`}>
+                <i className={toast.type === 'success' ? "fa-solid fa-circle-check" : "fa-solid fa-circle-info"}></i>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function StudentFormInner({ editingStudent, existingIds, onClose, onSubmit }) {
+      const [formData, setFormData] = useState(() => {
+        if (editingStudent) {
+          return {
+            ...editingStudent,
+            fullName: editingStudent.fullName || editingStudent.full_name || ''
+          };
+        }
+        const nextNum = String(existingIds.length + 1).padStart(3, '0');
+        return {
+          id: `STU-2024-${nextNum}`,
+          fullName: '',
+          email: '',
+          phone: '',
+          dob: '',
+          gender: 'Female',
+          department: DEPARTMENTS[0],
+          semester: SEMESTERS[5],
+          cgpa: '',
+          status: 'Active',
+          address: ''
+        };
+      });
+
+      const [errors, setErrors] = useState({});
+
+      const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(p => ({ ...p, [name]: value }));
+        if (errors[name]) setErrors(p => ({ ...p, [name]: '' }));
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const errs = {};
+        if (!formData.fullName.trim() || formData.fullName.trim().length < 3) errs.fullName = 'Name must be at least 3 characters.';
+        if (!formData.id.trim()) errs.id = 'ID is required.';
+        else if (!editingStudent && existingIds.includes(formData.id.trim())) errs.id = 'ID already exists!';
+        if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errs.email = 'Valid email is required.';
+        if (!formData.phone.trim() || !/^[0-9]{10}$/.test(formData.phone.replace(/[\s-]/g, ''))) errs.phone = '10-digit phone number is required.';
+        if (!formData.dob) errs.dob = 'Date of birth is required.';
+        if (formData.cgpa) {
+          const num = parseFloat(formData.cgpa);
+          if (isNaN(num) || num < 0 || num > 10) errs.cgpa = 'CGPA must be between 0 and 10.';
+        }
+
+        if (Object.keys(errs).length > 0) {
+          setErrors(errs);
+          return;
+        }
+
+        onSubmit({
+          ...formData,
+          admissionDate: formData.admissionDate || new Date().toISOString().split('T')[0]
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="student-form" noValidate>
+          <div className="form-grid">
+            <div className={`form-field ${errors.id ? 'field-error' : ''}`}>
+              <label>Student ID / Roll No <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-id-card field-icon"></i>
+                <input type="text" name="id" value={formData.id} onChange={handleChange} disabled={!!editingStudent} />
+              </div>
+              {errors.id && <span className="err-text">{errors.id}</span>}
+            </div>
+
+            <div className={`form-field ${errors.fullName ? 'field-error' : ''}`}>
+              <label>Full Name <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-user field-icon"></i>
+                <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} placeholder="e.g. Aiswarya Bala" />
+              </div>
+              {errors.fullName && <span className="err-text">{errors.fullName}</span>}
+            </div>
+
+            <div className={`form-field ${errors.email ? 'field-error' : ''}`}>
+              <label>Email Address <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-envelope field-icon"></i>
+                <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="student@example.com" />
+              </div>
+              {errors.email && <span className="err-text">{errors.email}</span>}
+            </div>
+
+            <div className={`form-field ${errors.phone ? 'field-error' : ''}`}>
+              <label>Phone Number <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-phone field-icon"></i>
+                <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="10 digits" />
+              </div>
+              {errors.phone && <span className="err-text">{errors.phone}</span>}
+            </div>
+
+            <div className={`form-field ${errors.dob ? 'field-error' : ''}`}>
+              <label>Date of Birth <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-calendar-days field-icon"></i>
+                <input type="date" name="dob" value={formData.dob} onChange={handleChange} />
+              </div>
+              {errors.dob && <span className="err-text">{errors.dob}</span>}
+            </div>
+
+            <div className="form-field">
+              <label>Gender</label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-venus-mars field-icon"></i>
+                <select name="gender" value={formData.gender} onChange={handleChange}>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label>Department <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-graduation-cap field-icon"></i>
+                <select name="department" value={formData.department} onChange={handleChange}>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="form-field">
+              <label>Current Semester <span className="req">*</span></label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-book-open field-icon"></i>
+                <select name="semester" value={formData.semester} onChange={handleChange}>
+                  {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className={`form-field ${errors.cgpa ? 'field-error' : ''}`}>
+              <label>CGPA (0.0 &ndash; 10.0)</label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-chart-line field-icon"></i>
+                <input type="number" step="0.1" name="cgpa" value={formData.cgpa} onChange={handleChange} placeholder="8.8" />
+              </div>
+              {errors.cgpa && <span className="err-text">{errors.cgpa}</span>}
+            </div>
+
+            <div className="form-field">
+              <label>Status</label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-circle-check field-icon"></i>
+                <select name="status" value={formData.status} onChange={handleChange}>
+                  <option value="Active">Active</option>
+                  <option value="Graduated">Graduated</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-field full-width">
+              <label>City / Address</label>
+              <div className="input-wrap">
+                <i className="fa-solid fa-location-dot field-icon"></i>
+                <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="e.g. Bengaluru, Karnataka" />
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">
+              <i className={editingStudent ? "fa-solid fa-check" : "fa-solid fa-user-plus"}></i>
+              <span>{editingStudent ? 'Save Changes' : 'Complete Registration'}</span>
+            </button>
+          </div>
+        </form>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
